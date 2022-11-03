@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2020-2022 Intel Corporation
+
+myport = CndpPort(jsonc_file="/build/bess/bessctl/conf/samples/cndp/fwd.jsonc", lport_index=0)
+
+input0 = PortInc(port=myport)
+
+input0 -> Sink()
