@@ -1,5 +1,6 @@
 # Copyright (c) 2014-2017, The Regents of the University of California.
 # Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# Copyright (c) 2020-2022 Intel Corporation.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -30,6 +31,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+
 # Disable all implicit Makefile rules
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES: ;
@@ -46,6 +48,7 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 $(shell mkdir -p $(DEPDIR)/utils >/dev/null)
 $(shell mkdir -p $(DEPDIR)/modules >/dev/null)
 $(shell mkdir -p $(DEPDIR)/drivers >/dev/null)
+$(shell mkdir -p $(DEPDIR)/drivers/cndp >/dev/null)
 $(shell mkdir -p $(DEPDIR)/gate_hooks >/dev/null)
 $(shell mkdir -p $(DEPDIR)/resume_hooks >/dev/null)
 $(shell mkdir -p $(DEPDIR)/pb >/dev/null)
@@ -69,7 +72,7 @@ ALWAYS_DYN_LIBS := -lpthread -ldl
 # These libraries are not supported by pkg-config.
 ALWAYS_LIBS := -lpcap -lgflags -lnuma
 # If pkg-config is available, we just need a list of the dependecies.
-PKG_CONFIG_DEPS := libdpdk libglog protobuf grpc++ libunwind zlib
+PKG_CONFIG_DEPS := libdpdk libglog protobuf grpc++ libunwind zlib libcndp
 # If pkg-config is not available, we need to list the libs we depend on.
 NO_PKG_CONFIG_LIBS := -lglog -lgflags -lprotobuf -lgrpc++ -lunwind -lz
 # If pkg-config is not available and we're static linking, we also need
@@ -183,6 +186,7 @@ endif
 # path points to files (instead of directories), but that's
 # a severe user-configuration error.
 DRIVER_PLUGINS := $(foreach dir,$(PLUGINS),$(wildcard $(dir)/drivers))
+DRIVER_CNDP_PLUGINS := $(foreach dir,$(PLUGINS),$(wildcard $(dir)/drivers/cndp))
 MODULE_PLUGINS := $(foreach dir,$(PLUGINS),$(wildcard $(dir)/modules))
 PROTO_PLUGINS := $(foreach dir,$(PLUGINS),$(wildcard $(dir)/protobuf))
 UTIL_PLUGINS := $(foreach dir,$(PLUGINS),$(wildcard $(dir)/utils))
@@ -214,6 +218,7 @@ PROTOCFLAGS += --cpp_out=./pb --grpc_out=./pb --plugin=protoc-gen-grpc=$(PROTOC_
 # sources -- it's just all the files in all modules/.
 # Use MODULE_SRCS below, which filters them out, when that's important.
 DRIVERS := $(foreach dir,drivers $(DRIVER_PLUGINS),$(wildcard $(dir)/*.cc))
+DRIVERS_CNDP := $(foreach dir,drivers/cndp $(DRIVER_CNDP_PLUGINS),$(wildcard $(dir)/*.cc))
 MODULES := $(foreach dir,modules,$(wildcard $(dir)/*.cc))
 UTILS := $(foreach dir,utils $(UTIL_PLUGINS),$(wildcard $(dir)/*.cc))
 GATE_HOOK_SRCS := $(foreach dir,gate_hooks $(GATE_HOOK_PLUGINS),$(wildcard $(dir)/*.cc))
@@ -221,6 +226,7 @@ GATE_HOOKS_H := $(foreach dir,gate_hooks $(GATE_HOOK_PLUGINS),$(wildcard $(dir)/
 RESUME_HOOK_SRCS := $(foreach dir,resume_hooks $(RESUME_HOOK_PLUGINS),$(wildcard $(dir)/*.cc))
 RESUME_HOOKS_H := $(foreach dir,resume_hooks $(RESUME_HOOK_PLUGINS),$(wildcard $(dir)/*.h))
 DRIVER_H := $(foreach dir,drivers $(DRIVER_PLUGINS),$(wildcard $(dir)/*.h))
+DRIVER_CNDP_H := $(foreach dir,drivers/cndp $(DRIVER_CNDP_PLUGINS),$(wildcard $(dir)/*.h))
 MODULE_H := $(foreach dir,drivers,$(wildcard $(dir)/*.h))
 UTIL_H := $(foreach dir,utils $(UTIL_PLUGINS),$(wildcard $(dir)/*.h))
 PLUGIN_MODULES := $(foreach dir,$(MODULE_PLUGINS),$(wildcard $(dir)/*.cc))
@@ -245,12 +251,13 @@ vpath %.cc $(PLUGINS)
 # for gate hooks and resume hooks, but there are some for drivers,
 # modules, and utils.
 vpath %.cc drivers $(DRIVER_PLUGINS)
+vpath %.cc drivers/cndp $(DRIVER_CNDP_PLUGINS)
 vpath %.cc modules $(MODULE_PLUGINS)
 vpath %.cc utils $(UTIL_PLUGINS)
 vpath %.cc gate_hooks $(GATE_HOOK_PLUGINS)
 vpath %.cc resume_hooks $(RESUME_HOOK_PLUGINS)
 
-ALL_SRCS := $(wildcard *.cc) $(GATE_HOOKS) $(RESUME_HOOKS) $(MODULES) $(DRIVERS) $(UTILS)
+ALL_SRCS := $(wildcard *.cc) $(GATE_HOOKS) $(RESUME_HOOKS) $(MODULES) $(DRIVERS) $(DRIVERS_CNDP) $(UTILS)
 
 TEST_SRCS := $(filter %_test.cc gtest_main.cc, $(ALL_SRCS))
 TEST_OBJS := $(patsubst %.cc,%.o,$(notdir $(TEST_SRCS)))
@@ -283,13 +290,17 @@ DRIVER_SRCS := $(filter-out $(TEST_SRCS) $(BENCH_SRCS), $(DRIVERS))
 DRIVER_OBJS := $(addprefix drivers/,$(patsubst %.cc,%.o, \
                  $(notdir $(DRIVER_SRCS))))
 
+DRIVER_CNDP_SRCS := $(filter-out $(TEST_SRCS) $(BENCH_SRCS), $(DRIVERS_CNDP))
+DRIVER_CNDP_OBJS := $(addprefix drivers/cndp/,$(patsubst %.cc,%.o, \
+                 $(notdir $(DRIVER_CNDP_SRCS))))
+
 UTIL_SRCS := $(filter-out $(TEST_SRCS) $(BENCH_SRCS), $(UTILS))
 UTIL_OBJS := $(addprefix utils/,$(patsubst %.cc,%.o,$(notdir $(UTIL_SRCS))))
 
-SRCS := $(filter-out $(TEST_SRCS) $(BENCH_SRCS) $(MODULE_SRCS) $(DRIVER_SRCS) $(UTIL_SRCS) $(GATE_HOOK_SRCS) $(RESUME_HOOK_SRCS), $(ALL_SRCS)) $(PROTO_SRCS)
+SRCS := $(filter-out $(TEST_SRCS) $(BENCH_SRCS) $(MODULE_SRCS) $(DRIVER_SRCS) $(DRIVER_CNDP_SRCS) $(UTIL_SRCS) $(GATE_HOOK_SRCS) $(RESUME_HOOK_SRCS), $(ALL_SRCS)) $(PROTO_SRCS)
 # ? why doesn't HEADERS include module headers?
-HEADERS := $(wildcard *.h utils/*.h) $(DRIVER_H) $(GATE_HOOKS_H) $(RESUME_HOOKS_H)
-OBJS := $(SRCS:.cc=.o) $(DRIVER_OBJS) $(UTIL_OBJS) $(GATE_HOOK_OBJS) $(RESUME_HOOK_OBJS)
+HEADERS := $(wildcard *.h utils/*.h) $(DRIVER_H) $(DRIVER_CNDP_H) $(GATE_HOOKS_H) $(RESUME_HOOKS_H)
+OBJS := $(SRCS:.cc=.o) $(DRIVER_OBJS) $(DRIVER_CNDP_OBJS) $(UTIL_OBJS) $(GATE_HOOK_OBJS) $(RESUME_HOOK_OBJS)
 
 ifndef MODULE_LINK_DYNAMIC
   OBJS += $(MODULE_OBJS)
@@ -382,6 +393,12 @@ $(eval $(call BUILD, \
         DRIVER_CXX, \
         drivers/%.o, \
         drivers/%.cc $(PROTO_HEADERS), \
+        $(CXX) -o $$@ -c $$< $$(CXXFLAGS) $$(DEPFLAGS)))
+
+$(eval $(call BUILD, \
+        DRIVER_CNDP_CXX, \
+        drivers/cndp/%.o, \
+        drivers/cndp/%.cc $(PROTO_HEADERS), \
         $(CXX) -o $$@ -c $$< $$(CXXFLAGS) $$(DEPFLAGS)))
 
 $(eval $(call BUILD, \

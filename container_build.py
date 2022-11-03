@@ -161,6 +161,13 @@ def build_kmod_buildtest():
     run_docker_cmd('ls -x -d %s | xargs -n 1 sh -c %s' %
                    (kernels_to_test, shell_quote(kmod_build)))
 
+def run_all_test():
+    all_test_cmd = 'cd core && ./all_test --gtest_shuffle'
+    try:
+        run_docker_cmd('%s' % all_test_cmd)
+    except:
+        print('*** all_test as failed.', file=sys.stderr)
+
 
 def build_all():
     build_bess()
@@ -191,6 +198,7 @@ def main():
         'clean': do_clean,
         'dist_clean': do_dist_clean,
         'shell': run_shell,
+        'all_test': run_all_test,
         'help': lambda: print_usage(parser),
     }
     cmdlist = sorted(cmds.keys())

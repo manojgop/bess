@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v2
       - run: sudo sysctl -w vm.nr_hugepages=512
       - run: sudo apt-get update
-      - run: sudo apt-get install -y python3-pip python3-setuptools python3-coverage python3-pyelftools ccache
+      - run: sudo apt-get install -y python3-pip python3-setuptools python3-coverage python3-pyelftools ccache libbpf-dev
       - run: pip3 install --user -r requirements.txt
       - run: '[[ ${COVERAGE:-0} == 0 ]] || sudo apt-get install -y gcc-7'
       - run: '[[ ${SANITIZE:-0} == 0 ]] || sudo apt-get install -y llvm-3.9'
